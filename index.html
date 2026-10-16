@@ -15,11 +15,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" crossorigin="anonymous"></script>
 <style>
-  /* Layout: a settings card above a column of A4 sheet previews; each sheet prints as one wordless page of 1 to 6 picture sudokus (a row of the pictures to use, the grid, and optional cut-out pieces), and an optional answers sheet comes last. */
+  /* Layout: maker mode is a settings card above a column of A4 sheet previews; each sheet prints in black and white as one wordless page of 1 to 6 picture sudokus (the pictures to use and an answer QR code above the grid, optional cut-out pieces beside or below it). Answer mode (the QR's #4s12c… link) is one puzzle solved, on a card in the middle of the screen. */
   :root{
     --ink:#1f2a44; --grape:#5b47b0; --cream:#f7f1e3; --cream-dark:#e2d6b8;
-    --go:#2fa34a; --red:#e0533d; --tint:#e8eefb; --hint:#fff1b8;
+    --go:#2fa34a; --red:#e0533d; --tint:#e6e6e6; --hint:#fff1b8;
     --read:Verdana,Tahoma,sans-serif;
     --title:'Luckiest Guy','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
     --z:1;
@@ -61,7 +62,7 @@
 
   #pages{display:flex;flex-direction:column;align-items:center;gap:22px}
   .page{position:relative}
-  .reroll{position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:50%;border:0;background:var(--cream);
+  .reroll{position:absolute;bottom:8px;right:8px;width:44px;height:44px;border-radius:50%;border:0;background:var(--cream);
     box-shadow:0 3px 0 rgba(0,0,0,.2);display:grid;place-items:center;padding:0}
   .reroll svg{width:24px;height:24px}
 
@@ -76,18 +77,24 @@
   .pz .thin{stroke:var(--ink);fill:none}
   .pz .thick{stroke:var(--ink);fill:none;stroke-linecap:square}
   .pz .key{fill:#fff;stroke:var(--ink)}
-  .pz .badge circle{fill:var(--ink)}
-  .pz .badge text{fill:#fff;font-family:Verdana,Tahoma,sans-serif;font-weight:bold;text-anchor:middle;dominant-baseline:central}
   .pz .cut{fill:#fff;stroke:var(--ink);stroke-dasharray:1.2 1}
   .pz .sep{stroke:var(--ink);stroke-dasharray:1.2 1}
-  .pz .emoji{font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;text-anchor:middle;dominant-baseline:central}
   .pz .num{font-family:Verdana,Tahoma,sans-serif;font-weight:bold;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+
+  /* ---------- answer ---------- */
+  #answer{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;
+    padding-top:calc(64px + env(safe-area-inset-top,0px))}
+  .solved{width:min(100%,560px,calc(100dvh - 120px));background:#fff;border-radius:14px;padding:14px;box-shadow:0 6px 0 rgba(0,0,0,.2);
+    display:flex;flex-direction:column;align-items:center;gap:12px}
+  .solved svg{width:100%;height:auto;display:block}
+  #make{color:var(--grape);font-size:14px}
+  body.answering #maker, body:not(.answering) #answer{display:none}
 
   /* ---------- print: only the sheets, one per page ---------- */
   @page{size:A4 portrait;margin:0}
   @media print{
     body{background:#fff}
-    #home,main>header,#controls,.reroll{display:none!important}
+    #home,main>header,#controls,.reroll,#answer{display:none!important}
     main{padding:0;max-width:none}
     #pages{display:block}
     .sheet{zoom:1!important;box-shadow:none}
@@ -98,10 +105,10 @@
 <body>
 <a id="home" href="../index.html" aria-label="All games" title="All games"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9.8V20h12V9.8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><path d="M10 20v-5.5h4V20" fill="currentColor"/></svg></a>
 
-<main>
+<main id="maker">
   <header>
     <h1>Picture Sudoku</h1>
-    <p>Print a sheet of sudokus. Every row, every column and every thick box needs each picture once. Your child draws the missing pictures, or cuts out the pieces and glues them in.</p>
+    <p>Print a sheet of sudokus. Every row, every column and every thick box needs each picture once. Your child draws the missing pictures, or cuts out the pieces and glues them in. Scan a puzzle's QR code to see its answer.</p>
   </header>
   <form id="controls" onsubmit="return false">
     <label>Grid
@@ -109,7 +116,7 @@
     </label>
     <label>Level <select id="level"></select></label>
     <label>Pictures
-      <select id="pics"><option value="shapes">Shapes</option><option value="animals">Animals</option><option value="fruit">Fruit</option><option value="dots">Dice dots</option><option value="numbers">Numbers</option><option value="mix">A mix</option></select>
+      <select id="pics"><option value="shapes">Shapes</option><option value="things">Sun, fish, house…</option><option value="dots">Dice dots</option><option value="numbers">Numbers</option><option value="mix">A mix</option></select>
     </label>
     <label>Per page
       <select id="perPage"><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select>
@@ -117,25 +124,25 @@
     <label>Cut-out pieces
       <select id="pieces"><option value="yes">Yes</option><option value="no">No</option></select>
     </label>
-    <label>Answers sheet
-      <select id="answers"><option value="yes">Yes</option><option value="no">No</option></select>
-    </label>
     <label>Pages <input id="sheets" type="number" inputmode="numeric"></label>
     <div class="btns"><button id="new" type="button">New puzzles</button><button id="print" type="button">Print</button></div>
   </form>
   <div id="pages"></div>
 </main>
 
+<main id="answer"><div id="solved" class="solved"></div></main>
+
 <script>
 /* ======== tuning ======== */
-const DEFAULTS = { size: 4, level: 0, pics: 'shapes', perPage: 2, pieces: 'yes', answers: 'yes', sheets: 1 };
+const DEFAULTS = { size: 4, level: 0, pics: 'shapes', perPage: 2, pieces: 'yes', sheets: 1 };
 const LEVELS = ['Easy', 'Medium', 'Hard'];
 const BLANKS = { 3: [3, 4, 5], 4: [5, 8, 10], 6: [10, 16, 22] };   // empty squares per level, by grid size
 const SHEETS_MAX = 20;
 const GRID = { 1: [1, 1], 2: [1, 2], 4: [2, 2], 6: [2, 3] };       // puzzles per page → columns × rows
 const MAX_CELL = 38;                 // mm, biggest square on the sheet
 const PIC = 0.74;                    // a picture's size, as a share of its square
-const ANSWER_GRID = [3, 4];          // answers sheet: small solved grids, columns × rows
+const QR_MIN = 16, QR_MAX = 22;      // mm, size of the answer QR code (it grows with the squares)
+const PUBLIC_URL = 'https://tb-x.github.io/picture-sudoku/';   // where the QR points when the maker isn't on GitHub Pages
 const TRIES = 40;                    // fresh grids to try when a level's empty-square count is hard to reach
 
 /* ======== small helpers ======== */
@@ -153,38 +160,59 @@ const saveSettings = () => { try { localStorage.setItem(KEY, JSON.stringify(sett
 const clamp = (v, a, b, d) => (Number.isFinite(+v) && v !== '' ? Math.min(b, Math.max(a, Math.round(+v))) : d);
 
 /* ======== pictures ======== */
-// each is drawn in a 100 × 100 box centred on 0,0
-const STROKE = 'stroke="#1f2a44" stroke-width="5" stroke-linejoin="round"';
+// Each is drawn in a 100 × 100 box centred on 0,0, as black lines on white: the sheets are printed in black and
+// white, so every picture in a set has its own outline, and a child can colour them in.
+const INK = '#1f2a44';
+const STROKE = `fill="#fff" stroke="${INK}" stroke-width="5" stroke-linejoin="round"`;
 const starPath = () => range(10).map((i) => {
   const r = i % 2 ? 19 : 47, a = (i * 36 - 90) * Math.PI / 180;
   return `${i ? 'L' : 'M'}${f(r * Math.cos(a))} ${f(r * Math.sin(a) + 4)}`;
 }).join('') + 'z';
 const SHAPES = [
-  `<circle r="40" fill="#ef4444" ${STROKE}/>`,
-  `<rect x="-36" y="-36" width="72" height="72" rx="8" fill="#3b82f6" ${STROKE}/>`,
-  `<path d="M0-40 44 36H-44z" fill="#22a55b" ${STROKE}/>`,
-  `<path d="M0 40C-30 18-46 2-46-16-46-32-34-42-22-42-10-42-3-35 0-27 3-35 10-42 22-42 34-42 46-32 46-16 46 2 30 18 0 40z" fill="#ec4899" ${STROKE}/>`,
-  `<path d="${starPath()}" fill="#facc15" ${STROKE}/>`,
-  `<path d="M0-46 36 0 0 46-36 0z" fill="#8b5cf6" ${STROKE}/>`,
+  `<circle r="40" ${STROKE}/>`,
+  `<rect x="-36" y="-36" width="72" height="72" rx="8" ${STROKE}/>`,
+  `<path d="M0-40 44 36H-44z" ${STROKE}/>`,
+  `<path d="M0 40C-30 18-46 2-46-16-46-32-34-42-22-42-10-42-3-35 0-27 3-35 10-42 22-42 34-42 46-32 46-16 46 2 30 18 0 40z" ${STROKE}/>`,
+  `<path d="${starPath()}" ${STROKE}/>`,
+  `<path d="M0-46 36 0 0 46-36 0z" ${STROKE}/>`,
+];
+const rays = range(8).map((k) => {
+  const a = k * Math.PI / 4, c = Math.cos(a), si = Math.sin(a);
+  return `M${f(31 * c)} ${f(31 * si)}L${f(45 * c)} ${f(45 * si)}`;
+}).join('');
+const petals = range(5).map((k) => {
+  const a = (k * 72 - 90) * Math.PI / 180;
+  return `<circle cx="${f(24 * Math.cos(a))}" cy="${f(24 * Math.sin(a) + 2)}" r="16" ${STROKE}/>`;
+}).join('');
+const THINGS = [
+  `<path d="${rays}" stroke="${INK}" stroke-width="6" stroke-linecap="round"/><circle r="22" ${STROKE}/>`,                        // sun
+  `<g transform="translate(2 0)"><path d="M-46-20-24 0-46 20z" ${STROKE}/><path d="M-24 0C-8-30 26-30 42 0 26 30-8 30-24 0z" ${STROKE}/>
+    <circle cx="24" cy="-5" r="4.5" fill="${INK}"/></g>`,                                                                       // fish
+  `<rect x="-30" y="-6" width="60" height="44" ${STROKE}/><path d="M-42-2 0-42 42-2z" ${STROKE}/>
+    <rect x="-8" y="14" width="16" height="24" ${STROKE}/>`,                                                                     // house
+  `<rect x="-7" y="22" width="14" height="20" ${STROKE}/><path d="M0-44 30-6H14L38 26H-38L-14-6H-30z" ${STROKE}/>`,                // tree
+  `${petals}<circle cy="2" r="13" ${STROKE}/>`,                                                                                   // flower
+  `<path d="M27-37.6A40 40 0 1 0 27 37.6 42 42 0 0 1 27-37.6z" ${STROKE}/>`,                                                      // moon
 ];
 const PIPS = { 1: ['c'], 2: ['tl', 'br'], 3: ['tl', 'c', 'br'], 4: ['tl', 'tr', 'bl', 'br'], 5: ['tl', 'tr', 'c', 'bl', 'br'], 6: ['tl', 'ml', 'bl', 'tr', 'mr', 'br'] };
 const PIP_AT = { c: [0, 0], tl: [-22, -22], tr: [22, -22], bl: [-22, 22], br: [22, 22], ml: [-22, 0], mr: [22, 0] };
-const dice = (v) => `<rect x="-42" y="-42" width="84" height="84" rx="14" fill="#fff" ${STROKE}/>` +
-  PIPS[v].map((p) => `<circle cx="${PIP_AT[p][0]}" cy="${PIP_AT[p][1]}" r="9.5" fill="#1f2a44"/>`).join('');
-const EMOJI = {
-  animals: ['🐶', '🐸', '🐷', '🐱', '🐰', '🐼'],
-  fruit: ['🍎', '🍌', '🍇', '🍐', '🍊', '🍓'],
-};
-const SET_NAMES = ['shapes', 'animals', 'fruit', 'dots', 'numbers'];
+const dice = (v) => `<rect x="-42" y="-42" width="84" height="84" rx="14" ${STROKE}/>` +
+  PIPS[v].map((p) => `<circle cx="${PIP_AT[p][0]}" cy="${PIP_AT[p][1]}" r="9.5" fill="${INK}"/>`).join('');
+const SET_CODE = { shapes: 's', things: 't', dots: 'd', numbers: 'n' };   // also the letter in the answer link
+const SET_NAMES = Object.keys(SET_CODE);
 
 // picture v (1..n) of a set, drawn s mm wide centred on x, y
 function pic(set, v, x, y, s) {
   const g = (inner) => `<g transform="translate(${f(x)} ${f(y)}) scale(${f(s / 100)})">${inner}</g>`;
   if (set === 'shapes') return g(SHAPES[v - 1]);
+  if (set === 'things') return g(THINGS[v - 1]);
   if (set === 'dots') return g(dice(v));
-  if (set === 'numbers') return g(`<text class="num" font-size="78" y="3">${v}</text>`);
-  return g(`<text class="emoji" font-size="82" y="5">${EMOJI[set][v - 1]}</text>`);
+  return g(`<text class="num" font-size="78" y="3">${v}</text>`);
 }
+
+// scissors for the cut line, s mm long, pointing right
+const scissors = (x, y, s, rot = 0) => `<g transform="translate(${f(x)} ${f(y)}) rotate(${rot}) scale(${f(s / 100)})" fill="none" stroke="${INK}" stroke-width="9" stroke-linecap="round">
+  <circle cx="-30" cy="-20" r="16"/><circle cx="-30" cy="20" r="16"/><path d="M-16-12 46 22M-16 12 46-22"/></g>`;
 
 /* ======== sudoku: units, solver, generator ======== */
 // box height × width; a 3 × 3 grid has no boxes (just rows and columns)
@@ -272,16 +300,48 @@ function makePuzzle(n, level, set) {
   return best;
 }
 
+/* ======== answer link and QR code ======== */
+// #4s12c4… : grid size, picture set, then every square row by row: a digit where the picture is given,
+// a letter (a = 1, b = 2 …) where the square is empty
+const answerHash = (pz) => `#${pz.n}${SET_CODE[pz.set]}` + pz.solution.map((v, i) => (pz.given[i] ? v : 'abcdef'[v - 1])).join('');
+const answerBase = () => (location.hostname.endsWith('github.io') ? location.origin + location.pathname : PUBLIC_URL);
+
+function parseHash() {
+  const m = /^#([346])([a-z])([1-6a-f]+)$/.exec(location.hash);
+  if (!m) return null;
+  const n = +m[1], set = SET_NAMES.find((k) => SET_CODE[k] === m[2]), cells = [...m[3]];
+  if (!set || cells.length !== n * n) return null;
+  const solution = cells.map((ch) => (/\d/.test(ch) ? +ch : 'abcdef'.indexOf(ch) + 1));
+  const { units } = unitsOf(n);
+  if (solution.some((v) => v > n) || units.some((u) => new Set(u.map((i) => solution[i])).size !== n)) return null;
+  return { n, set, solution, given: cells.map((ch) => /\d/.test(ch)) };
+}
+
+// the QR code as SVG, s mm square at x, y; on screen it's also a link to the answer
+function qrSvg(hash, x, y, s) {
+  if (typeof qrcode !== 'function') return '';   // library didn't load
+  const q = qrcode(0, 'M');
+  q.addData(answerBase() + hash);
+  q.make();
+  const n = q.getModuleCount(), pad = 1, t = n + 2 * pad;
+  let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + pad} ${r + pad}h1v1h-1z`;
+  return `<a href="${hash}" target="_blank"><g transform="translate(${f(x)} ${f(y)}) scale(${f(s / t)})">
+    <rect width="${t}" height="${t}" fill="#fff"/><path d="${d}" fill="#000" shape-rendering="crispEdges"/></g></a>`;
+}
+
 /* ======== drawing one puzzle ======== */
 const LEGEND_GAP = 3, PIECES_GAP = 8;   // mm
 const legendSize = (c) => Math.min(14, Math.max(6, c * 0.5));
+const qrSize = (c) => Math.min(QR_MAX, Math.max(QR_MIN, c * 0.6));
+const headerSize = (c) => Math.max(legendSize(c), qrSize(c));
 const piecesOf = (pz) => range(pz.n * pz.n).filter((i) => !pz.given[i]).map((i) => pz.solution[i]).sort((a, b) => a - b);
 
-// The biggest square size that fits the puzzle (key row, grid, pieces) into w × h mm, with the pieces
+// The biggest square size that fits the puzzle (key row and QR, grid, pieces) into w × h mm, with the pieces
 // below the grid or, when that leaves bigger squares, beside it. Returns { c, cols, rows, beside }.
 function fitLayout(n, nPieces, w, h) {
   for (let c = Math.min(MAX_CELL, w / n); c > 3; c -= 0.25) {
-    const top = legendSize(c) + LEGEND_GAP, gw = n * c;
+    const top = headerSize(c) + LEGEND_GAP, gw = n * c;
     if (!nPieces) { if (top + gw <= h) return { c, cols: 0, rows: 0 }; continue; }
     let cols = Math.min(nPieces, Math.floor(w / c)), rows = Math.ceil(nPieces / cols);
     if (top + gw + PIECES_GAP + rows * c <= h) return { c, cols, rows, beside: false };
@@ -291,11 +351,10 @@ function fitLayout(n, nPieces, w, h) {
   return { c: 3, cols: Math.min(nPieces, 20), rows: Math.ceil(nPieces / 20), beside: false };
 }
 
-// returns an <svg> sized in mm. opts: key (row of pictures to use), pieces (cut-out squares), answer (solved), no (puzzle number)
+// returns an <svg> sized in mm. opts: qr (answer QR code), pieces (cut-out squares), answer (solved, the empty squares yellow)
 function puzzleSvg(pz, lay, opts) {
   const { n, set } = pz, b = BOX[n], { c } = lay, gw = n * c;
-  const L = opts.key ? legendSize(c) : opts.no ? Math.max(5, c * 0.4) : 0;
-  const top = L ? L + LEGEND_GAP : 0;
+  const Q = opts.qr ? qrSize(c) : 0, hh = opts.qr ? headerSize(c) : legendSize(c), top = hh + LEGEND_GAP;
   const pieces = opts.pieces ? piecesOf(pz) : [];
   const { cols, rows, beside } = pieces.length ? lay : { cols: 0, rows: 0 };
   const W = beside ? gw + PIECES_GAP + cols * c : Math.max(gw, cols * c);
@@ -303,23 +362,15 @@ function puzzleSvg(pz, lay, opts) {
   const gx = beside ? 0 : (W - gw) / 2, gy = top, thin = Math.max(0.25, c * 0.012), thick = Math.max(0.7, c * 0.035);
   let s = `<svg class="pz" width="${f(W)}mm" height="${f(H)}mm" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true">`;
 
-  // the number (to match the answers sheet) and the pictures this puzzle uses
-  if (L) {
-    let x = gx;
-    if (opts.no) {
-      const r = L * 0.42;
-      s += `<g class="badge"><circle cx="${f(x + r)}" cy="${f(L / 2)}" r="${f(r)}"/><text x="${f(x + r)}" y="${f(L / 2 + r * 0.06)}" font-size="${f(r * (opts.no > 9 ? 0.95 : 1.2))}">${opts.no}</text></g>`;
-      x += 2 * r + L * 0.4;
-    }
-    if (opts.key) {
-      const kw = n * L * 1.1 + L * 0.3;
-      x = opts.no ? x : gx + (gw - kw) / 2;
-      s += `<rect class="key" x="${f(x)}" y="0" width="${f(kw)}" height="${f(L)}" rx="${f(L * 0.25)}" stroke-width="${f(thin)}"/>`;
-      for (let v = 1; v <= n; v++) s += pic(set, v, x + L * 0.15 + (v - 0.5) * L * 1.1, L / 2, L * 0.82);
-    }
-  }
+  // the pictures this puzzle uses, and the QR code to its answer at the grid's right edge
+  const room = Q ? gw - Q - 3 : gw;
+  const L = Math.min(legendSize(c), room / (n * 1.1 + 0.3)), kw = n * L * 1.1 + L * 0.3;
+  const kx = Q ? gx : gx + (gw - kw) / 2, ky = (hh - L) / 2;
+  s += `<rect class="key" x="${f(kx)}" y="${f(ky)}" width="${f(kw)}" height="${f(L)}" rx="${f(L * 0.25)}" stroke-width="${f(thin)}"/>`;
+  for (let v = 1; v <= n; v++) s += pic(set, v, kx + L * 0.15 + (v - 0.5) * L * 1.1, ky + L / 2, L * 0.82);
+  if (Q) s += qrSvg(answerHash(pz), gx + gw - Q, (hh - Q) / 2, Q);
 
-  // squares, tinted box by box so the boxes are easy to see; on the answers sheet the ones to fill in are yellow
+  // squares, shaded box by box so the boxes are easy to see
   for (let i = 0; i < n * n; i++) {
     const r = Math.floor(i / n), col = i % n;
     const tint = b && (Math.floor(r / b[0]) + Math.floor(col / b[1])) % 2;
@@ -336,13 +387,11 @@ function puzzleSvg(pz, lay, opts) {
 
   // cut-out pieces: one per empty square, the same size as a square, past a dashed line with scissors
   if (rows) {
-    const sc = PIECES_GAP * 0.75, mid = PIECES_GAP / 2;
+    const sc = PIECES_GAP * 0.8, mid = PIECES_GAP / 2;
     const px = beside ? gw + PIECES_GAP : (W - cols * c) / 2, py = beside ? gy : gy + gw + PIECES_GAP;
     s += beside
-      ? `<line class="sep" stroke-width="${f(thin)}" x1="${f(gw + mid)}" y1="${f(gy + sc * 1.2)}" x2="${f(gw + mid)}" y2="${f(H)}"/>
-         <text class="emoji" x="${f(gw + mid)}" y="${f(gy + sc / 2)}" font-size="${f(sc)}" transform="rotate(90 ${f(gw + mid)} ${f(gy + sc / 2)})">✂️</text>`
-      : `<line class="sep" stroke-width="${f(thin)}" x1="${f(sc * 1.2)}" y1="${f(py - mid)}" x2="${f(W)}" y2="${f(py - mid)}"/>
-         <text class="emoji" x="${f(sc / 2)}" y="${f(py - mid)}" font-size="${f(sc)}">✂️</text>`;
+      ? `<line class="sep" stroke-width="${f(thin)}" x1="${f(gw + mid)}" y1="${f(gy + sc * 1.1)}" x2="${f(gw + mid)}" y2="${f(H)}"/>${scissors(gw + mid, gy + sc / 2, sc, 90)}`
+      : `<line class="sep" stroke-width="${f(thin)}" x1="${f(sc * 1.1)}" y1="${f(py - mid)}" x2="${f(W)}" y2="${f(py - mid)}"/>${scissors(sc / 2, py - mid, sc)}`;
     pieces.forEach((v, k) => {
       const x = px + (k % cols) * c, y = py + Math.floor(k / cols) * c;
       s += `<rect class="cut" stroke-width="${f(thin)}" x="${f(x)}" y="${f(y)}" width="${f(c)}" height="${f(c)}"/>`;
@@ -359,30 +408,18 @@ const SHEET_W = 186, SHEET_H = 272.5, GAP = 8;   // mm inside the page margins
 const pickSet = () => (settings.pics === 'mix' ? SET_NAMES[rint(0, SET_NAMES.length - 1)] : settings.pics);
 const makePage = () => range(settings.perPage).map(() => makePuzzle(settings.size, settings.level, pickSet()));
 
-function sheetHtml(puzzles, firstNo, opts) {
-  const [cols, rows] = opts.grid, w = (SHEET_W - (cols - 1) * GAP) / cols, h = (SHEET_H - (rows - 1) * GAP) / rows;
-  const slots = puzzles.map((pz, k) => {
-    const lay = opts.answer ? { c: Math.min(w / pz.n, (h - Math.max(5, 0.4 * w / pz.n) - LEGEND_GAP) / pz.n) }
-                            : fitLayout(pz.n, opts.pieces ? piecesOf(pz).length : 0, w, h);
-    return `<div class="slot">${puzzleSvg(pz, lay, { ...opts, no: opts.numbered ? firstNo + k : 0 })}</div>`;
-  }).join('');
+function sheetHtml(puzzles) {
+  const [cols, rows] = GRID[puzzles.length], w = (SHEET_W - (cols - 1) * GAP) / cols, h = (SHEET_H - (rows - 1) * GAP) / rows;
+  const pieces = settings.pieces === 'yes';
+  const slots = puzzles.map((pz) => `<div class="slot">${puzzleSvg(pz, fitLayout(pz.n, pieces ? piecesOf(pz).length : 0, w, h), { qr: true, pieces })}</div>`).join('');
   return `<div class="sheet" style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">${slots}</div>`;
 }
 
 const REROLL = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9" fill="none" stroke="#1f2a44" stroke-width="2.6" stroke-linecap="round"/><path d="M20 3v6h-6" fill="none" stroke="#1f2a44" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 function renderPages() {
-  const numbered = settings.answers === 'yes', per = settings.perPage;
-  let html = pages.map((pzs, i) => `<div class="page">${sheetHtml(pzs, i * per + 1,
-    { grid: GRID[per], key: true, pieces: settings.pieces === 'yes', numbered })}
+  $('pages').innerHTML = pages.map((pzs, i) => `<div class="page">${sheetHtml(pzs)}
     <button class="reroll" data-i="${i}" aria-label="New puzzles for this page" title="New puzzles for this page">${REROLL}</button></div>`).join('');
-  if (numbered) {   // answers: small solved grids, the squares to fill in shown yellow
-    const all = pages.flat(), perSheet = ANSWER_GRID[0] * ANSWER_GRID[1];
-    for (let i = 0; i < all.length; i += perSheet) {
-      html += `<div class="page">${sheetHtml(all.slice(i, i + perSheet), i + 1, { grid: ANSWER_GRID, answer: true, numbered: true })}</div>`;
-    }
-  }
-  $('pages').innerHTML = html;
   fitPages();
 }
 
@@ -405,7 +442,6 @@ function readControls() {
     pics: [...SET_NAMES, 'mix'].includes($('pics').value) ? $('pics').value : DEFAULTS.pics,
     perPage: +$('perPage').value in GRID ? +$('perPage').value : DEFAULTS.perPage,
     pieces: $('pieces').value === 'no' ? 'no' : 'yes',
-    answers: $('answers').value === 'no' ? 'no' : 'yes',
     sheets: clamp($('sheets').value, 1, SHEETS_MAX, DEFAULTS.sheets),
   };
   writeControls();
@@ -414,14 +450,15 @@ function readControls() {
 function writeControls() {
   if (!(settings.size in BLANKS)) settings.size = DEFAULTS.size;
   if (!(settings.perPage in GRID)) settings.perPage = DEFAULTS.perPage;
+  if (![...SET_NAMES, 'mix'].includes(settings.pics)) settings.pics = DEFAULTS.pics;   // e.g. a set that was dropped
   levelOptions();
-  for (const k of ['size', 'pics', 'perPage', 'pieces', 'answers', 'sheets']) $(k).value = settings[k];
+  for (const k of ['size', 'pics', 'perPage', 'pieces', 'sheets']) $(k).value = settings[k];
   $('sheets').min = 1; $('sheets').max = SHEETS_MAX;
 }
 
 function newAll() { pages = range(settings.sheets).map(makePage); renderPages(); }
 
-function start() {
+function startMaker() {
   writeControls();
   for (const k of ['size', 'level', 'perPage']) $(k).addEventListener('change', () => { readControls(); newAll(); });
   $('pics').addEventListener('change', () => {   // same puzzles, new pictures
@@ -429,7 +466,7 @@ function start() {
     for (const pz of pages.flat()) pz.set = pickSet();
     renderPages();
   });
-  for (const k of ['pieces', 'answers']) $(k).addEventListener('change', () => { readControls(); renderPages(); });
+  $('pieces').addEventListener('change', () => { readControls(); renderPages(); });
   $('sheets').addEventListener('change', () => {   // keep the pages already made, add or drop at the end
     readControls();
     pages = pages.slice(0, settings.sheets);
@@ -447,11 +484,26 @@ function start() {
   addEventListener('resize', fitPages);
   newAll();
 }
-start();
+
+/* ======== answer page ======== */
+// the puzzle solved, with the squares that were empty shown yellow
+function showAnswer(pz) {
+  document.body.classList.add('answering');
+  $('solved').innerHTML = `${puzzleSvg(pz, { c: 10 }, { answer: true })}<a id="make" href="./">Make new puzzles</a>`;
+}
+
+/* ======== start ======== */
+function route() {
+  const pz = parseHash();
+  if (pz) showAnswer(pz);
+  else { document.body.classList.remove('answering'); if (!pages.length) startMaker(); }
+}
+addEventListener('hashchange', () => location.reload());
+route();
 </script>
 <script>
-// Offline support: sw.js caches this page. Once the page has loaded, send it every file the page used (fonts)
-// so those work offline too. Fails quietly where unsupported, e.g. on file://.
+// Offline support: sw.js caches this page. Once the page has loaded, send it every file the page used (fonts,
+// the QR library) so those work offline too. Fails quietly where unsupported, e.g. on file://.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then((reg) => {
     const send = () => reg.active && reg.active.postMessage({ cache: [location.href, ...performance.getEntriesByType('resource').map((r) => r.name)] });
