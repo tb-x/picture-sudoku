@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Picture Sudoku</title>
+<meta name="theme-color" content="#5b47b0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Picture Sudoku">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap">
+<style>
+  /* Layout: a settings card above a column of A4 sheet previews; each sheet prints as one wordless page of 1 to 6 picture sudokus (a row of the pictures to use, the grid, and optional cut-out pieces), and an optional answers sheet comes last. */
+  :root{
+    --ink:#1f2a44; --grape:#5b47b0; --cream:#f7f1e3; --cream-dark:#e2d6b8;
+    --go:#2fa34a; --red:#e0533d; --tint:#e8eefb; --hint:#fff1b8;
+    --read:Verdana,Tahoma,sans-serif;
+    --title:'Luckiest Guy','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+    --z:1;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0}
+  body{background:var(--grape);color:var(--ink);font-family:var(--read);-webkit-tap-highlight-color:transparent;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  button,input,select{font:inherit;color:inherit;touch-action:manipulation}
+  button{cursor:pointer}
+
+  #home{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:50;
+    width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:#2a2140;background:rgba(255,255,255,.82);
+    box-shadow:0 3px 0 rgba(0,0,0,.18);touch-action:manipulation;-webkit-tap-highlight-color:transparent;text-decoration:none}
+  #home svg{width:24px;height:24px}
+  #home:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+
+  /* ---------- maker ---------- */
+  main{max-width:860px;margin:0 auto;
+    padding:calc(12px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px))
+            calc(28px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px))}
+  header{padding-left:56px;min-height:44px;color:#fff}
+  h1{font-family:var(--title);font-weight:400;font-size:clamp(30px,6vw,42px);letter-spacing:1px;line-height:1.1;margin:0;
+    text-shadow:0 3px 0 rgba(0,0,0,.25)}
+  header p{margin:6px 0 0;font-size:14px;line-height:1.45;opacity:.92}
+  #controls{margin:16px 0 22px;background:var(--cream);border-radius:16px;padding:14px;box-shadow:0 4px 0 rgba(0,0,0,.2);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:12px 14px}
+  #controls label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:bold}
+  #controls input,#controls select{height:44px;width:100%;border:2px solid var(--cream-dark);border-radius:10px;background:#fff;
+    padding:0 10px;font-size:16px}
+  .btns{grid-column:1/-1;display:flex;gap:10px}
+  .btns button{flex:1;height:54px;border:0;border-radius:14px;color:#fff;font-family:var(--title);font-size:clamp(18px,5.4vw,24px);letter-spacing:1px;white-space:nowrap;
+    padding-top:4px;box-shadow:0 4px 0 rgba(0,0,0,.25)}
+  .btns button:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+  #new{background:var(--red)}
+  #print{background:var(--go)}
+
+  #pages{display:flex;flex-direction:column;align-items:center;gap:22px}
+  .page{position:relative}
+  .reroll{position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:50%;border:0;background:var(--cream);
+    box-shadow:0 3px 0 rgba(0,0,0,.2);display:grid;place-items:center;padding:0}
+  .reroll svg{width:24px;height:24px}
+
+  /* one printed A4 page; all sizes in mm so the preview is the print. --z shrinks the preview to fit a phone. */
+  .sheet{zoom:var(--z);width:210mm;height:296.5mm;padding:12mm;background:#fff;overflow:hidden;
+    display:grid;gap:8mm;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  .slot{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0}
+  .slot svg{display:block}
+  .pz .cell{fill:#fff}
+  .pz .cell.tint{fill:var(--tint)}
+  .pz .cell.hint{fill:var(--hint)}
+  .pz .thin{stroke:var(--ink);fill:none}
+  .pz .thick{stroke:var(--ink);fill:none;stroke-linecap:square}
+  .pz .key{fill:#fff;stroke:var(--ink)}
+  .pz .badge circle{fill:var(--ink)}
+  .pz .badge text{fill:#fff;font-family:Verdana,Tahoma,sans-serif;font-weight:bold;text-anchor:middle;dominant-baseline:central}
+  .pz .cut{fill:#fff;stroke:var(--ink);stroke-dasharray:1.2 1}
+  .pz .sep{stroke:var(--ink);stroke-dasharray:1.2 1}
+  .pz .emoji{font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;text-anchor:middle;dominant-baseline:central}
+  .pz .num{font-family:Verdana,Tahoma,sans-serif;font-weight:bold;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+
+  /* ---------- print: only the sheets, one per page ---------- */
+  @page{size:A4 portrait;margin:0}
+  @media print{
+    body{background:#fff}
+    #home,main>header,#controls,.reroll{display:none!important}
+    main{padding:0;max-width:none}
+    #pages{display:block}
+    .sheet{zoom:1!important;box-shadow:none}
+    .page:not(:last-child){break-after:page}
+  }
+</style>
+</head>
+<body>
+<a id="home" href="../index.html" aria-label="All games" title="All games"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9.8V20h12V9.8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><path d="M10 20v-5.5h4V20" fill="currentColor"/></svg></a>
+
+<main>
+  <header>
+    <h1>Picture Sudoku</h1>
+    <p>Print a sheet of sudokus. Every row, every column and every thick box needs each picture once. Your child draws the missing pictures, or cuts out the pieces and glues them in.</p>
+  </header>
+  <form id="controls" onsubmit="return false">
+    <label>Grid
+      <select id="size"><option value="3">3 × 3</option><option value="4">4 × 4</option><option value="6">6 × 6</option></select>
+    </label>
+    <label>Level <select id="level"></select></label>
+    <label>Pictures
+      <select id="pics"><option value="shapes">Shapes</option><option value="animals">Animals</option><option value="fruit">Fruit</option><option value="dots">Dice dots</option><option value="numbers">Numbers</option><option value="mix">A mix</option></select>
+    </label>
+    <label>Per page
+      <select id="perPage"><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select>
+    </label>
+    <label>Cut-out pieces
+      <select id="pieces"><option value="yes">Yes</option><option value="no">No</option></select>
+    </label>
+    <label>Answers sheet
+      <select id="answers"><option value="yes">Yes</option><option value="no">No</option></select>
+    </label>
+    <label>Pages <input id="sheets" type="number" inputmode="numeric"></label>
+    <div class="btns"><button id="new" type="button">New puzzles</button><button id="print" type="button">Print</button></div>
+  </form>
+  <div id="pages"></div>
+</main>
+
+<script>
+/* ======== tuning ======== */
+const DEFAULTS = { size: 4, level: 0, pics: 'shapes', perPage: 2, pieces: 'yes', answers: 'yes', sheets: 1 };
+const LEVELS = ['Easy', 'Medium', 'Hard'];
+const BLANKS = { 3: [3, 4, 5], 4: [5, 8, 10], 6: [10, 16, 22] };   // empty squares per level, by grid size
+const SHEETS_MAX = 20;
+const GRID = { 1: [1, 1], 2: [1, 2], 4: [2, 2], 6: [2, 3] };       // puzzles per page → columns × rows
+const MAX_CELL = 38;                 // mm, biggest square on the sheet
+const PIC = 0.74;                    // a picture's size, as a share of its square
+const ANSWER_GRID = [3, 4];          // answers sheet: small solved grids, columns × rows
+const TRIES = 40;                    // fresh grids to try when a level's empty-square count is hard to reach
+
+/* ======== small helpers ======== */
+const $ = (id) => document.getElementById(id);
+const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rint(0, i); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const range = (n) => Array.from({ length: n }, (_, i) => i);
+const f = (x) => +x.toFixed(2);
+
+/* ======== settings (remembered per browser) ======== */
+const KEY = 'sudoku.settings';
+let settings = { ...DEFAULTS };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(KEY)) || {}); } catch { /* blocked on file:// */ }
+const saveSettings = () => { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* ignore */ } };
+const clamp = (v, a, b, d) => (Number.isFinite(+v) && v !== '' ? Math.min(b, Math.max(a, Math.round(+v))) : d);
+
+/* ======== pictures ======== */
+// each is drawn in a 100 × 100 box centred on 0,0
+const STROKE = 'stroke="#1f2a44" stroke-width="5" stroke-linejoin="round"';
+const starPath = () => range(10).map((i) => {
+  const r = i % 2 ? 19 : 47, a = (i * 36 - 90) * Math.PI / 180;
+  return `${i ? 'L' : 'M'}${f(r * Math.cos(a))} ${f(r * Math.sin(a) + 4)}`;
+}).join('') + 'z';
+const SHAPES = [
+  `<circle r="40" fill="#ef4444" ${STROKE}/>`,
+  `<rect x="-36" y="-36" width="72" height="72" rx="8" fill="#3b82f6" ${STROKE}/>`,
+  `<path d="M0-40 44 36H-44z" fill="#22a55b" ${STROKE}/>`,
+  `<path d="M0 40C-30 18-46 2-46-16-46-32-34-42-22-42-10-42-3-35 0-27 3-35 10-42 22-42 34-42 46-32 46-16 46 2 30 18 0 40z" fill="#ec4899" ${STROKE}/>`,
+  `<path d="${starPath()}" fill="#facc15" ${STROKE}/>`,
+  `<path d="M0-46 36 0 0 46-36 0z" fill="#8b5cf6" ${STROKE}/>`,
+];
+const PIPS = { 1: ['c'], 2: ['tl', 'br'], 3: ['tl', 'c', 'br'], 4: ['tl', 'tr', 'bl', 'br'], 5: ['tl', 'tr', 'c', 'bl', 'br'], 6: ['tl', 'ml', 'bl', 'tr', 'mr', 'br'] };
+const PIP_AT = { c: [0, 0], tl: [-22, -22], tr: [22, -22], bl: [-22, 22], br: [22, 22], ml: [-22, 0], mr: [22, 0] };
+const dice = (v) => `<rect x="-42" y="-42" width="84" height="84" rx="14" fill="#fff" ${STROKE}/>` +
+  PIPS[v].map((p) => `<circle cx="${PIP_AT[p][0]}" cy="${PIP_AT[p][1]}" r="9.5" fill="#1f2a44"/>`).join('');
+const EMOJI = {
+  animals: ['🐶', '🐸', '🐷', '🐱', '🐰', '🐼'],
+  fruit: ['🍎', '🍌', '🍇', '🍐', '🍊', '🍓'],
+};
+const SET_NAMES = ['shapes', 'animals', 'fruit', 'dots', 'numbers'];
+
+// picture v (1..n) of a set, drawn s mm wide centred on x, y
+function pic(set, v, x, y, s) {
+  const g = (inner) => `<g transform="translate(${f(x)} ${f(y)}) scale(${f(s / 100)})">${inner}</g>`;
+  if (set === 'shapes') return g(SHAPES[v - 1]);
+  if (set === 'dots') return g(dice(v));
+  if (set === 'numbers') return g(`<text class="num" font-size="78" y="3">${v}</text>`);
+  return g(`<text class="emoji" font-size="82" y="5">${EMOJI[set][v - 1]}</text>`);
+}
+
+/* ======== sudoku: units, solver, generator ======== */
+// box height × width; a 3 × 3 grid has no boxes (just rows and columns)
+const BOX = { 3: null, 4: [2, 2], 6: [2, 3] };
+const unitCache = {};
+function unitsOf(n) {
+  if (unitCache[n]) return unitCache[n];
+  const units = [];
+  for (const r of range(n)) units.push(range(n).map((c) => r * n + c));
+  for (const c of range(n)) units.push(range(n).map((r) => r * n + c));
+  const b = BOX[n];
+  if (b) for (let br = 0; br < n; br += b[0]) for (let bc = 0; bc < n; bc += b[1]) {
+    const u = [];
+    for (let r = br; r < br + b[0]; r++) for (let c = bc; c < bc + b[1]; c++) u.push(r * n + c);
+    units.push(u);
+  }
+  const peers = range(n * n).map((i) => [...new Set(units.filter((u) => u.includes(i)).flat())].filter((j) => j !== i));
+  return (unitCache[n] = { units, peers });
+}
+
+function fullGrid(n) {
+  const { peers } = unitsOf(n), g = new Array(n * n).fill(0);
+  const fill = (i) => {
+    if (i === n * n) return true;
+    for (const v of shuffle(range(n).map((k) => k + 1))) {
+      if (peers[i].some((j) => g[j] === v)) continue;
+      g[i] = v;
+      if (fill(i + 1)) return true;
+    }
+    g[i] = 0;
+    return false;
+  };
+  fill(0);
+  return g;
+}
+
+// Solve with only the steps a young child can take; true if that fills the whole grid.
+// level 0: a row, column or box with one empty square left. 1: also a square where only one picture fits.
+// 2: also a picture that fits in only one square of a row, column or box.
+function kidSolvable(puzzle, n, level) {
+  const { units, peers } = unitsOf(n), g = puzzle.slice();
+  const cands = (i) => range(n).map((k) => k + 1).filter((v) => !peers[i].some((j) => g[j] === v));
+  for (let progress = true; progress;) {
+    progress = false;
+    for (const u of units) {
+      const empty = u.filter((i) => !g[i]);
+      if (empty.length !== 1) continue;
+      g[empty[0]] = range(n).map((k) => k + 1).find((v) => !u.some((i) => g[i] === v));
+      progress = true;
+    }
+    if (progress || level < 1) continue;
+    for (let i = 0; i < n * n; i++) {
+      if (g[i]) continue;
+      const c = cands(i);
+      if (c.length === 1) { g[i] = c[0]; progress = true; }
+    }
+    if (progress || level < 2) continue;
+    for (const u of units) for (let v = 1; v <= n; v++) {
+      if (u.some((i) => g[i] === v)) continue;
+      const spots = u.filter((i) => !g[i] && cands(i).includes(v));
+      if (spots.length === 1) { g[spots[0]] = v; progress = true; }
+    }
+  }
+  return g.every(Boolean);
+}
+
+// a puzzle: the solved grid, and which squares are given (the rest are left empty)
+function makePuzzle(n, level, set) {
+  const target = BLANKS[n][level];
+  let best = null;
+  for (let t = 0; t < TRIES; t++) {
+    const solution = fullGrid(n), grid = solution.slice();
+    let blanks = 0;
+    for (const i of shuffle(range(n * n))) {
+      if (blanks === target) break;
+      const v = grid[i];
+      grid[i] = 0;
+      if (kidSolvable(grid, n, level)) blanks++;
+      else grid[i] = v;
+    }
+    const pz = { n, set, solution, given: grid.map(Boolean), blanks };
+    if (!best || blanks > best.blanks) best = pz;
+    if (blanks === target) break;
+  }
+  return best;
+}
+
+/* ======== drawing one puzzle ======== */
+const LEGEND_GAP = 3, PIECES_GAP = 8;   // mm
+const legendSize = (c) => Math.min(14, Math.max(6, c * 0.5));
+const piecesOf = (pz) => range(pz.n * pz.n).filter((i) => !pz.given[i]).map((i) => pz.solution[i]).sort((a, b) => a - b);
+
+// The biggest square size that fits the puzzle (key row, grid, pieces) into w × h mm, with the pieces
+// below the grid or, when that leaves bigger squares, beside it. Returns { c, cols, rows, beside }.
+function fitLayout(n, nPieces, w, h) {
+  for (let c = Math.min(MAX_CELL, w / n); c > 3; c -= 0.25) {
+    const top = legendSize(c) + LEGEND_GAP, gw = n * c;
+    if (!nPieces) { if (top + gw <= h) return { c, cols: 0, rows: 0 }; continue; }
+    let cols = Math.min(nPieces, Math.floor(w / c)), rows = Math.ceil(nPieces / cols);
+    if (top + gw + PIECES_GAP + rows * c <= h) return { c, cols, rows, beside: false };
+    cols = Math.ceil(nPieces / n); rows = Math.ceil(nPieces / cols);
+    if (gw + PIECES_GAP + cols * c <= w && top + gw <= h) return { c, cols, rows, beside: true };
+  }
+  return { c: 3, cols: Math.min(nPieces, 20), rows: Math.ceil(nPieces / 20), beside: false };
+}
+
+// returns an <svg> sized in mm. opts: key (row of pictures to use), pieces (cut-out squares), answer (solved), no (puzzle number)
+function puzzleSvg(pz, lay, opts) {
+  const { n, set } = pz, b = BOX[n], { c } = lay, gw = n * c;
+  const L = opts.key ? legendSize(c) : opts.no ? Math.max(5, c * 0.4) : 0;
+  const top = L ? L + LEGEND_GAP : 0;
+  const pieces = opts.pieces ? piecesOf(pz) : [];
+  const { cols, rows, beside } = pieces.length ? lay : { cols: 0, rows: 0 };
+  const W = beside ? gw + PIECES_GAP + cols * c : Math.max(gw, cols * c);
+  const H = top + (beside ? Math.max(gw, rows * c) : gw + (rows ? PIECES_GAP + rows * c : 0));
+  const gx = beside ? 0 : (W - gw) / 2, gy = top, thin = Math.max(0.25, c * 0.012), thick = Math.max(0.7, c * 0.035);
+  let s = `<svg class="pz" width="${f(W)}mm" height="${f(H)}mm" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true">`;
+
+  // the number (to match the answers sheet) and the pictures this puzzle uses
+  if (L) {
+    let x = gx;
+    if (opts.no) {
+      const r = L * 0.42;
+      s += `<g class="badge"><circle cx="${f(x + r)}" cy="${f(L / 2)}" r="${f(r)}"/><text x="${f(x + r)}" y="${f(L / 2 + r * 0.06)}" font-size="${f(r * (opts.no > 9 ? 0.95 : 1.2))}">${opts.no}</text></g>`;
+      x += 2 * r + L * 0.4;
+    }
+    if (opts.key) {
+      const kw = n * L * 1.1 + L * 0.3;
+      x = opts.no ? x : gx + (gw - kw) / 2;
+      s += `<rect class="key" x="${f(x)}" y="0" width="${f(kw)}" height="${f(L)}" rx="${f(L * 0.25)}" stroke-width="${f(thin)}"/>`;
+      for (let v = 1; v <= n; v++) s += pic(set, v, x + L * 0.15 + (v - 0.5) * L * 1.1, L / 2, L * 0.82);
+    }
+  }
+
+  // squares, tinted box by box so the boxes are easy to see; on the answers sheet the ones to fill in are yellow
+  for (let i = 0; i < n * n; i++) {
+    const r = Math.floor(i / n), col = i % n;
+    const tint = b && (Math.floor(r / b[0]) + Math.floor(col / b[1])) % 2;
+    const cls = opts.answer && !pz.given[i] ? 'cell hint' : tint ? 'cell tint' : 'cell';
+    s += `<rect class="${cls}" x="${f(gx + col * c)}" y="${f(gy + r * c)}" width="${f(c)}" height="${f(c)}"/>`;
+    if (pz.given[i] || opts.answer) s += pic(set, pz.solution[i], gx + (col + 0.5) * c, gy + (r + 0.5) * c, c * PIC);
+  }
+  for (let k = 1; k < n; k++) {
+    const boxRow = b && k % b[0] === 0, boxCol = b && k % b[1] === 0;
+    s += `<line class="${boxRow ? 'thick' : 'thin'}" stroke-width="${f(boxRow ? thick : thin)}" x1="${f(gx)}" y1="${f(gy + k * c)}" x2="${f(gx + gw)}" y2="${f(gy + k * c)}"/>`;
+    s += `<line class="${boxCol ? 'thick' : 'thin'}" stroke-width="${f(boxCol ? thick : thin)}" x1="${f(gx + k * c)}" y1="${f(gy)}" x2="${f(gx + k * c)}" y2="${f(gy + gw)}"/>`;
+  }
+  s += `<rect class="thick" stroke-width="${f(thick)}" x="${f(gx)}" y="${f(gy)}" width="${f(gw)}" height="${f(gw)}"/>`;
+
+  // cut-out pieces: one per empty square, the same size as a square, past a dashed line with scissors
+  if (rows) {
+    const sc = PIECES_GAP * 0.75, mid = PIECES_GAP / 2;
+    const px = beside ? gw + PIECES_GAP : (W - cols * c) / 2, py = beside ? gy : gy + gw + PIECES_GAP;
+    s += beside
+      ? `<line class="sep" stroke-width="${f(thin)}" x1="${f(gw + mid)}" y1="${f(gy + sc * 1.2)}" x2="${f(gw + mid)}" y2="${f(H)}"/>
+         <text class="emoji" x="${f(gw + mid)}" y="${f(gy + sc / 2)}" font-size="${f(sc)}" transform="rotate(90 ${f(gw + mid)} ${f(gy + sc / 2)})">✂️</text>`
+      : `<line class="sep" stroke-width="${f(thin)}" x1="${f(sc * 1.2)}" y1="${f(py - mid)}" x2="${f(W)}" y2="${f(py - mid)}"/>
+         <text class="emoji" x="${f(sc / 2)}" y="${f(py - mid)}" font-size="${f(sc)}">✂️</text>`;
+    pieces.forEach((v, k) => {
+      const x = px + (k % cols) * c, y = py + Math.floor(k / cols) * c;
+      s += `<rect class="cut" stroke-width="${f(thin)}" x="${f(x)}" y="${f(y)}" width="${f(c)}" height="${f(c)}"/>`;
+      s += pic(set, v, x + c / 2, y + c / 2, c * PIC);
+    });
+  }
+  return s + '</svg>';
+}
+
+/* ======== maker: sheets ======== */
+let pages = [];   // each page is a list of puzzles
+const SHEET_W = 186, SHEET_H = 272.5, GAP = 8;   // mm inside the page margins
+
+const pickSet = () => (settings.pics === 'mix' ? SET_NAMES[rint(0, SET_NAMES.length - 1)] : settings.pics);
+const makePage = () => range(settings.perPage).map(() => makePuzzle(settings.size, settings.level, pickSet()));
+
+function sheetHtml(puzzles, firstNo, opts) {
+  const [cols, rows] = opts.grid, w = (SHEET_W - (cols - 1) * GAP) / cols, h = (SHEET_H - (rows - 1) * GAP) / rows;
+  const slots = puzzles.map((pz, k) => {
+    const lay = opts.answer ? { c: Math.min(w / pz.n, (h - Math.max(5, 0.4 * w / pz.n) - LEGEND_GAP) / pz.n) }
+                            : fitLayout(pz.n, opts.pieces ? piecesOf(pz).length : 0, w, h);
+    return `<div class="slot">${puzzleSvg(pz, lay, { ...opts, no: opts.numbered ? firstNo + k : 0 })}</div>`;
+  }).join('');
+  return `<div class="sheet" style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">${slots}</div>`;
+}
+
+const REROLL = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9" fill="none" stroke="#1f2a44" stroke-width="2.6" stroke-linecap="round"/><path d="M20 3v6h-6" fill="none" stroke="#1f2a44" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function renderPages() {
+  const numbered = settings.answers === 'yes', per = settings.perPage;
+  let html = pages.map((pzs, i) => `<div class="page">${sheetHtml(pzs, i * per + 1,
+    { grid: GRID[per], key: true, pieces: settings.pieces === 'yes', numbered })}
+    <button class="reroll" data-i="${i}" aria-label="New puzzles for this page" title="New puzzles for this page">${REROLL}</button></div>`).join('');
+  if (numbered) {   // answers: small solved grids, the squares to fill in shown yellow
+    const all = pages.flat(), perSheet = ANSWER_GRID[0] * ANSWER_GRID[1];
+    for (let i = 0; i < all.length; i += perSheet) {
+      html += `<div class="page">${sheetHtml(all.slice(i, i + perSheet), i + 1, { grid: ANSWER_GRID, answer: true, numbered: true })}</div>`;
+    }
+  }
+  $('pages').innerHTML = html;
+  fitPages();
+}
+
+// shrink the A4 previews to the screen width (print resets the zoom)
+function fitPages() {
+  const sheetPx = 210 * 96 / 25.4;
+  document.documentElement.style.setProperty('--z', Math.min(1, $('pages').clientWidth / sheetPx).toFixed(3));
+}
+
+function levelOptions() {
+  $('level').innerHTML = LEVELS.map((name, i) => `<option value="${i}">${name} (${BLANKS[settings.size][i]})</option>`).join('');
+  $('level').value = settings.level;
+}
+
+function readControls() {
+  const size = +$('size').value;
+  settings = {
+    size: size in BLANKS ? size : DEFAULTS.size,
+    level: clamp($('level').value, 0, LEVELS.length - 1, DEFAULTS.level),
+    pics: [...SET_NAMES, 'mix'].includes($('pics').value) ? $('pics').value : DEFAULTS.pics,
+    perPage: +$('perPage').value in GRID ? +$('perPage').value : DEFAULTS.perPage,
+    pieces: $('pieces').value === 'no' ? 'no' : 'yes',
+    answers: $('answers').value === 'no' ? 'no' : 'yes',
+    sheets: clamp($('sheets').value, 1, SHEETS_MAX, DEFAULTS.sheets),
+  };
+  writeControls();
+  saveSettings();
+}
+function writeControls() {
+  if (!(settings.size in BLANKS)) settings.size = DEFAULTS.size;
+  if (!(settings.perPage in GRID)) settings.perPage = DEFAULTS.perPage;
+  levelOptions();
+  for (const k of ['size', 'pics', 'perPage', 'pieces', 'answers', 'sheets']) $(k).value = settings[k];
+  $('sheets').min = 1; $('sheets').max = SHEETS_MAX;
+}
+
+function newAll() { pages = range(settings.sheets).map(makePage); renderPages(); }
+
+function start() {
+  writeControls();
+  for (const k of ['size', 'level', 'perPage']) $(k).addEventListener('change', () => { readControls(); newAll(); });
+  $('pics').addEventListener('change', () => {   // same puzzles, new pictures
+    readControls();
+    for (const pz of pages.flat()) pz.set = pickSet();
+    renderPages();
+  });
+  for (const k of ['pieces', 'answers']) $(k).addEventListener('change', () => { readControls(); renderPages(); });
+  $('sheets').addEventListener('change', () => {   // keep the pages already made, add or drop at the end
+    readControls();
+    pages = pages.slice(0, settings.sheets);
+    while (pages.length < settings.sheets) pages.push(makePage());
+    renderPages();
+  });
+  $('new').addEventListener('click', () => { readControls(); newAll(); });
+  $('print').addEventListener('click', () => { readControls(); window.print(); });
+  $('pages').addEventListener('click', (e) => {
+    const b = e.target.closest('.reroll');
+    if (!b) return;
+    pages[+b.dataset.i] = makePage();
+    renderPages();
+  });
+  addEventListener('resize', fitPages);
+  newAll();
+}
+start();
+</script>
+<script>
+// Offline support: sw.js caches this page. Once the page has loaded, send it every file the page used (fonts)
+// so those work offline too. Fails quietly where unsupported, e.g. on file://.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then((reg) => {
+    const send = () => reg.active && reg.active.postMessage({ cache: [location.href, ...performance.getEntriesByType('resource').map((r) => r.name)] });
+    send(); setTimeout(send, 5000); setTimeout(send, 20000);
+  }).catch(() => {});
+}
+</script>
+</body>
+</html>
